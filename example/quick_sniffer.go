@@ -12,24 +12,34 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/0x4d31/quick"
+	//
+	// using relative path instead of absolute with $GOPATH
+	// for non gopath uses (like git clone )
+	//
+	quick ".."
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 )
 
 var (
-	//device string = "en0"
 	snaplen int32 = 1600
-	promisc bool = false
-	handle *pcap.Handle
-	filter string = "udp and dst port 443"
+	promisc bool  = false
+	handle  *pcap.Handle
+	filter  string = "udp and dst port 443"
 )
 
 func processPacket(packet gopacket.Packet) {
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
-	if udpLayer != nil && ipLayer != nil {
+
+	// ipLayer returns nil so we can avoid it
+	// and use only UDP frame to detect the version
+
+	// if udpLayer != nil && ipLayer != nil {
+
+	if udpLayer != nil {
 		ip, _ := ipLayer.(*layers.IPv4)
 		udp, _ := udpLayer.(*layers.UDP)
 		var clientHello = quick.CHLO{}
@@ -50,6 +60,10 @@ func processPacket(packet gopacket.Packet) {
 
 func main() {
 	iface := flag.String("i", "en0", "Specify a network interface to capture on")
+
+	// max number of packets
+	count := flag.Int("c", 0, "No of Packets (default:0)")
+
 	flag.Parse()
 
 	// Open device
@@ -63,10 +77,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Listening on", *iface, "\n")
+	fmt.Println("Listening on", *iface)
 	// Process packets
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+
+	c := 0
 	for packet := range packetSource.Packets() {
+		if c > *count {
+			return
+		}
 		processPacket(packet)
+		c++
 	}
 }
