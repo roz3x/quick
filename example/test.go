@@ -8,8 +8,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
-    //"os"
-    "encoding/binary"
+
+	"encoding/binary"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -21,24 +21,38 @@ var (
 	promisc bool  = false
 	handle  *pcap.Handle
 	filter  string = "udp and dst port 443"
+    count   int   = 0
 )
 
-func decode ( payload []byte ) {
+func decode(payload []byte) {
 
-    VersionNumber := binary.BigEndian.Uint32(payload[1:5])
+	VersionNumber := binary.BigEndian.Uint32(payload[1:5])
 
-    if VersionNumber & 0xffffff00  == 0xff000000 {
-        // iQUIC version
-        fmt.Printf("iQUIC version found \n")
-        fmt.Printf("%v %v %v \n",len(payload),payload[6],payload[6+payload[6]])
+	if VersionNumber&0xffffff00 == 0xff000000 {
+		// iQUIC version
 
-    } else if string(payload[1:3]) == "Q0" {
-        // gQUIC version
-        //fmt.Printf("gQUIC version found \n")
+		//fmt.Printf("iQUIC version found \n")
 
-    } else {
-        //fmt.Printf("version undefined : %v \n",VersionNumber)
-    }
+	} else if string(payload[1:3]) == "Q0" {
+		// gQUIC version
+
+        // formatter 
+
+		fmt.Printf("gQUIC version found \n")
+            if bytes.Contains(payload, []byte("CHLO")) {
+                fmt.Print("[]byte{")
+                for t, i := range payload {
+                    fmt.Printf(" 0x%X , ", i)
+                       if t % 20 == 0 {
+                      fmt.Printf("\n")
+                 }
+            }
+          fmt.Print("}")
+          os.Exit(0)
+        }
+	} else {
+		//fmt.Printf("version undefined : %v \n",VersionNumber)
+	}
 }
 
 func processPacket(packet gopacket.Packet) {
@@ -53,7 +67,6 @@ func processPacket(packet gopacket.Packet) {
 func main() {
 	iface := flag.String("i", "wlan0", "Specify a network interface to capture on")
 
-
 	flag.Parse()
 
 	handle, err := pcap.OpenLive(*iface, snaplen, promisc, pcap.BlockForever)
@@ -65,10 +78,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Listening on", *iface)
+	//fmt.Println("Listening on", *iface)
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range packetSource.Packets() {
 		processPacket(packet)
 	}
 }
-
