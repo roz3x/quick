@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"fmt"
 )
 
@@ -77,9 +76,6 @@ var (
 )
 
 func main() {
-	s, n := binary.Uvarint(quic46[6:])
-	fmt.Printf("%v -> %v \n", n, s)
-	s, n = binary.Uvarint(quic46[6+n:])
-	fmt.Printf("%v -> %v \n", n, s)
+	fmt.Printf("%v \n", quic46[6])
 	return
 }
