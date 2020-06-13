@@ -26,7 +26,7 @@ type CHLO struct {
 	DataLength      uint16
 	Tag             string
 	TagNumber       uint16
-	TagValues        map[string]string
+	TagValues       map[string]string
 	TagsInOrder     []string
 }
 
@@ -49,6 +49,9 @@ func (ch CHLO) String() string {
 }
 
 func (ch *CHLO) DecodeCHLO(payload []byte) error {
+	if string(payload[1:5]) == string([]byte{0xff, 0x00, 0x00, 0x1c}) {
+		return ch.decodeIETF(payload[:])
+	}
 	ch.Raw = payload
 	// Only process CHLO packets
 	if !(bytes.Contains(payload, []byte("CHLO"))) {
@@ -56,13 +59,13 @@ func (ch *CHLO) DecodeCHLO(payload []byte) error {
 	}
 	// Public Flags
 	ch.PublicFlags = payload[0]
-	ch.PfVersion = payload[0]&0x01 != 0             // Version
-	ch.PfReset = payload[0]&0x02 != 0               // Reset
-	ch.PfDivNonce = payload[0]&0x04 != 0            // Diversification Nonce
-	ch.PfCIDLen = payload[0]&0x08 != 0              // CID Length
-	ch.PfPacketNumLen = (payload[0]&0x30 >> 4) + 1  // Packet Number Length in bytes
-	ch.PfMultipath = payload[0]&0x40 != 0           // Multipath
-	ch.PfReserved = payload[0]&0x80 != 0            // Reserved
+	ch.PfVersion = payload[0]&0x01 != 0              // Version
+	ch.PfReset = payload[0]&0x02 != 0                // Reset
+	ch.PfDivNonce = payload[0]&0x04 != 0             // Diversification Nonce
+	ch.PfCIDLen = payload[0]&0x08 != 0               // CID Length
+	ch.PfPacketNumLen = (payload[0] & 0x30 >> 4) + 1 // Packet Number Length in bytes
+	ch.PfMultipath = payload[0]&0x40 != 0            // Multipath
+	ch.PfReserved = payload[0]&0x80 != 0             // Reserved
 	if ch.PublicFlags == 0 {
 		return ErrBadPFlags
 	}
@@ -84,7 +87,7 @@ func (ch *CHLO) DecodeCHLO(payload []byte) error {
 	case 2:
 		ch.PacketNumber = uint(binary.BigEndian.Uint16(hs[0:2]))
 	case 3:
-		ch.PacketNumber = (uint(hs[0])<<16) | (uint(hs[1])<<8) | uint(hs[2])
+		ch.PacketNumber = (uint(hs[0]) << 16) | (uint(hs[1]) << 8) | uint(hs[2])
 	}
 	hs = hs[ch.PfPacketNumLen:]
 	// Message Authentication Hash
@@ -93,9 +96,9 @@ func (ch *CHLO) DecodeCHLO(payload []byte) error {
 	ch.FrameType = hs[12]
 	ch.FtStream = hs[12]&0x80 != 0             // STREAM
 	ch.FtFIN = hs[12]&0x40 != 0                // FIN
-	ch.FtDataLength = (hs[12]&0x20  >> 5) + 1  // Data Length in bytes
-	ch.FtOffsetLength = hs[12]&0x1C >> 2       // Offset Length
-	ch.FtStreamLength = hs[12]&0x3             // Stream Length
+	ch.FtDataLength = (hs[12] & 0x20 >> 5) + 1 // Data Length in bytes
+	ch.FtOffsetLength = hs[12] & 0x1C >> 2     // Offset Length
+	ch.FtStreamLength = hs[12] & 0x3           // Stream Length
 	ch.StreamID = uint8(hs[13])                // Stream ID
 	// Data Length
 	if ch.FtDataLength == 2 {
@@ -113,7 +116,7 @@ func (ch *CHLO) DecodeCHLO(payload []byte) error {
 	}
 	// Tag Number
 	ch.TagNumber = binary.LittleEndian.Uint16(hs[20:22])
-	hs = hs[24:]  // Padding: 0000
+	hs = hs[24:] // Padding: 0000
 	if len(hs) < 2 {
 		return ErrBadLength
 	}
@@ -145,7 +148,7 @@ func (ch *CHLO) DecodeCHLO(payload []byte) error {
 		switch tag {
 		case "SNI", "UAID", "AEAD", "KEXS", "VER", "PDMD", "COPT":
 			ch.TagValues[tag] = string(hs[0:TagLen])
-		case "PAD":  //do nothing
+		case "PAD": //do nothing
 		default:
 			ch.TagValues[tag] = hex.EncodeToString(hs[0:TagLen])
 		}
